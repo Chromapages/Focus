@@ -1,5 +1,4 @@
 
-
 export enum Priority {
   Low = 'Low',
   Medium = 'Medium',
@@ -10,11 +9,18 @@ export interface Task {
   id: string;
   title: string;
   priority: Priority;
-  estimatedMinutes: number; // User input estimate
+  estimatedMinutes: number;
   isDueToday: boolean;
   completed: boolean;
   notes?: string;
   imageUrl?: string;
+}
+
+export interface Appointment {
+  id: string;
+  title: string;
+  time: string;
+  durationMinutes: number;
 }
 
 export enum BlockType {
@@ -27,6 +33,8 @@ export interface ScheduleBlock {
   type: BlockType;
   startTime: string; // HH:MM format
   endTime: string; // HH:MM format
+  actualStartTime?: string; // ISO string of when it actually started
+  actualEndTime?: string; // ISO string of when it actually ended
   durationMinutes: number;
   taskIds: string[]; // IDs of tasks assigned to this block
   label?: string; // e.g., "Deep Work", "Coffee Break"
@@ -58,6 +66,7 @@ export enum AppView {
   ActiveTimer = 'activeTimer',
   Rewards = 'rewards',
   Settings = 'settings',
+  VoiceAssistant = 'voiceAssistant',
 }
 
 export const LEVEL_THRESHOLDS = [0, 500, 1200, 2200, 3500, 5000, 7000, 10000];
@@ -70,25 +79,21 @@ export const REWARDS = [
   { level: 5, name: "Obsidian Theme", description: "Unlock Obsidian theme" },
 ];
 
-// --- THEME SYSTEM ---
-
 export interface Theme {
   id: string;
   name: string;
   unlockLevel: number;
-  // Colors & UI Tokens (Tailwind Classes)
   appBg: string;
-  panelBg: string; // Glass panels
+  panelBg: string;
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
-  primary: string; // Main action buttons, active states
+  primary: string;
   primaryHover: string;
-  secondary: string; // Less important elements
-  accent: string; // Highlights
+  secondary: string;
+  accent: string;
   border: string;
-  ring: string; // Focus rings
-  // Semantic colors
+  ring: string;
   success: string;
   danger: string;
 }
@@ -115,7 +120,7 @@ export const THEMES: Record<string, Theme> = {
   midnight: {
     id: 'midnight',
     name: 'Midnight Synth',
-    unlockLevel: 1, // Accessible early as "Dark Mode"
+    unlockLevel: 1,
     appBg: 'bg-slate-900',
     panelBg: 'bg-slate-800/60 backdrop-blur-xl border border-white/10',
     textPrimary: 'text-slate-50',

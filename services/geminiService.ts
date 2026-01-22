@@ -1,9 +1,12 @@
-import { GoogleGenAI, Type, Schema } from "@google/genai";
+
+import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Task, PartnerSchedule, DailySchedule, ScheduleBlock, BlockType, Priority } from "../types";
 
+// Initialize the Gemini API client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-const responseSchema: Schema = {
+// Define the response schema using the Type enum as per guidelines
+const responseSchema = {
   type: Type.OBJECT,
   properties: {
     blocks: {
@@ -17,8 +20,7 @@ const responseSchema: Schema = {
           assignedTaskIds: { 
             type: Type.ARRAY, 
             items: { type: Type.STRING } 
-          },
-          reasoning: { type: Type.STRING }
+          }
         },
         required: ["type", "durationMinutes", "label", "assignedTaskIds"]
       }
@@ -31,12 +33,12 @@ const responseSchema: Schema = {
   required: ["blocks", "overflowTaskIds"]
 };
 
+// Generate a daily schedule using the Gemini 3 Pro model for complex reasoning
 export const generateDailySchedule = async (
   tasks: Task[],
   partnerSchedule: PartnerSchedule,
   startTime: string
 ): Promise<DailySchedule> => {
-  
   const tasksJson = JSON.stringify(tasks.map(t => ({
     id: t.id,
     title: t.title,
@@ -51,88 +53,128 @@ export const generateDailySchedule = async (
 
   const prompt = `
     I need a daily schedule plan starting at ${startTime}.
-    
-    Here are my tasks:
-    ${tasksJson}
-
-    Context:
-    ${partnerContext}
-
+    Tasks: ${tasksJson}
+    Context: ${partnerContext}
     Rules:
-    1. Total work time (sum of 'work' blocks) MUST be between 8.5 and 10 hours. Do not exceed 10 hours.
-    2. One task = One Block. IMPORTANT: Use the 'estimate' provided in the task (e.g., 10 or 90 minutes) as the duration for its block.
-    3. BREAK LOGIC: Do NOT put a break after every block. Only schedule 2-3 short breaks (10m) TOTAL for the whole day. Place them strategically (e.g., after every 2 blocks or 3 hours of work).
-    4. Insert ONE long break (30m) for lunch/rest roughly halfway through the day.
-    5. Prioritize "dueToday" tasks and "High" priority tasks first.
-    6. If the sum of blocks exceeds the 10-hour limit, you MUST move the lowest priority or non-due-today tasks to 'overflowTaskIds'.
-    7. Return a structured JSON response.
+    1. Total work time MUST be between 8.5 and 10 hours.
+    2. Use provided estimates.
+    3. 2-3 short breaks (10m) TOTAL.
+    4. One long break (30m) for lunch.
+    5. Prioritize "dueToday" and "High" priority.
   `;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: responseSchema,
-        systemInstruction: "You are an expert productivity planner using time-blocking techniques. You optimize for flow state and realistic energy levels."
-      },
-    });
+  // Use gemini-3-pro-preview for complex scheduling tasks
+  const response = await ai.models.generateContent({
+    model: "gemini-3-pro-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: responseSchema,
+      systemInstruction: "You are an expert productivity planner. Return JSON."
+    },
+  });
 
-    const data = JSON.parse(response.text || "{}");
-    
-    // Post-process to add start/end times based on durations
-    let currentTime = new Date();
-    // Parse start time "HH:MM"
-    const [startH, startM] = startTime.split(':').map(Number);
-    currentTime.setHours(startH, startM, 0, 0);
+  // Access .text property directly (getter)
+  const data = JSON.parse(response.text || "{}");
+  let currentTime = new Date();
+  const [startH, startM] = startTime.split(':').map(Number);
+  currentTime.setHours(startH, startM, 0, 0);
 
-    const processedBlocks: ScheduleBlock[] = (data.blocks || []).map((b: any, index: number) => {
-      const blockStart = new Date(currentTime);
-      const duration = b.durationMinutes || 90;
-      currentTime.setMinutes(currentTime.getMinutes() + duration);
-      const blockEnd = new Date(currentTime);
-
-      return {
-        id: `block-${index}-${Date.now()}`,
-        type: b.type === 'work' ? BlockType.Work : BlockType.Break,
-        startTime: blockStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
-        endTime: blockEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
-        durationMinutes: duration,
-        taskIds: b.assignedTaskIds || [],
-        label: b.label || (b.type === 'work' ? "Focus Block" : "Break"),
-        completed: false
-      };
-    });
+  const processedBlocks: ScheduleBlock[] = (data.blocks || []).map((b: any, index: number) => {
+    const blockStart = new Date(currentTime);
+    const duration = b.durationMinutes || 90;
+    currentTime.setMinutes(currentTime.getMinutes() + duration);
+    const blockEnd = new Date(currentTime);
 
     return {
-      blocks: processedBlocks,
-      overflowTaskIds: data.overflowTaskIds || []
+      id: `block-${index}-${Date.now()}`,
+      type: b.type === 'work' ? BlockType.Work : BlockType.Break,
+      startTime: blockStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+      endTime: blockEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+      durationMinutes: duration,
+      taskIds: b.assignedTaskIds || [],
+      label: b.label || (b.type === 'work' ? "Focus Block" : "Break"),
+      completed: false
     };
+  });
 
-  } catch (error) {
-    console.error("AI Scheduling failed:", error);
-    throw new Error("Failed to generate schedule.");
-  }
+  return { blocks: processedBlocks, overflowTaskIds: data.overflowTaskIds || [] };
 };
 
+// Parse voice transcript into task data using Gemini 3 Flash model
 export const parseVoiceInput = async (transcript: string): Promise<Partial<Task>> => {
   const prompt = `Parse this task input into JSON: "${transcript}". 
-  Return { title: string, priority: 'Low'|'Medium'|'High', estimatedMinutes: number, isDueToday: boolean }.
-  Logic:
-  - Default estimatedMinutes: 90.
-  - If words like "quick", "short", "meeting", "check" are used, set estimatedMinutes: 10.
-  - Default priority: Medium.
-  - Default due: Today.`;
+  Return { title: string, priority: 'Low'|'Medium'|'High', estimatedMinutes: number, isDueToday: boolean }.`;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: { responseMimeType: "application/json" }
-    });
-    return JSON.parse(response.text || "{}");
-  } catch (e) {
-    return { title: transcript, priority: Priority.Medium, estimatedMinutes: 90, isDueToday: true };
-  }
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: { responseMimeType: "application/json" }
+  });
+  // Access .text property directly
+  return JSON.parse(response.text || "{}");
 };
+
+// Generate audio from text using the dedicated TTS model
+export const speakText = async (text: string): Promise<Uint8Array> => {
+  const aiTts = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const response = await aiTts.models.generateContent({
+    model: "gemini-2.5-flash-preview-tts",
+    contents: [{ parts: [{ text }] }],
+    config: {
+      responseModalities: [Modality.AUDIO],
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: { voiceName: 'Kore' },
+        },
+      },
+    },
+  });
+
+  const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+  if (!base64Audio) throw new Error("No audio data returned");
+  
+  // Use the internal decode function
+  return decode(base64Audio);
+};
+
+// Helper for decoding base64 audio strings
+export function decode(base64: string) {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+// Helper for decoding raw PCM data into an AudioBuffer
+export async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number,
+): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
+}
+
+// Helper for encoding binary data into a base64 string
+export function encode(bytes: Uint8Array) {
+  let binary = '';
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
