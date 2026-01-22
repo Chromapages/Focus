@@ -3,7 +3,7 @@ import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Task, PartnerSchedule, DailySchedule, ScheduleBlock, BlockType, Priority } from "../types";
 
 // Initialize the Gemini API client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
 // Define the response schema using the Type enum as per guidelines
 const responseSchema = {
@@ -17,9 +17,9 @@ const responseSchema = {
           type: { type: Type.STRING, enum: ["work", "break"] },
           durationMinutes: { type: Type.INTEGER },
           label: { type: Type.STRING },
-          assignedTaskIds: { 
-            type: Type.ARRAY, 
-            items: { type: Type.STRING } 
+          assignedTaskIds: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
           }
         },
         required: ["type", "durationMinutes", "label", "assignedTaskIds"]
@@ -117,7 +117,7 @@ export const parseVoiceInput = async (transcript: string): Promise<Partial<Task>
 
 // Generate audio from text using the dedicated TTS model
 export const speakText = async (text: string): Promise<Uint8Array> => {
-  const aiTts = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const aiTts = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
   const response = await aiTts.models.generateContent({
     model: "gemini-2.5-flash-preview-tts",
     contents: [{ parts: [{ text }] }],
@@ -133,7 +133,7 @@ export const speakText = async (text: string): Promise<Uint8Array> => {
 
   const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
   if (!base64Audio) throw new Error("No audio data returned");
-  
+
   // Use the internal decode function
   return decode(base64Audio);
 };
@@ -168,6 +168,50 @@ export async function decodeAudioData(
   }
   return buffer;
 }
+
+// Generate a dynamic daily briefing using Gemini
+export const generateBriefingContent = async (
+  tasks: Task[],
+  appointments: Appointment[],
+  userName: string
+): Promise<string> => {
+  const activeTasks = tasks.filter(t => !t.completed);
+  const dueToday = activeTasks.filter(t => t.isDueToday);
+  const highPriority = activeTasks.filter(t => t.priority === Priority.High);
+
+  const context = {
+    userName,
+    totalTasks: activeTasks.length,
+    dueTodayCount: dueToday.length,
+    highPriCount: highPriority.length,
+    appointmentsCount: appointments.length,
+    firstAppointment: appointments[0] ? `${appointments[0].title} at ${appointments[0].time}` : "None",
+    topTask: highPriority[0]?.title || dueToday[0]?.title || "None defined"
+  };
+
+  const prompt = `
+    Generate a short, punchy, motivating daily briefing for ${context.userName}.
+    Tone: "Jarvis" / Professional Executive Assistant. 
+    Strict Limit: 2-3 sentences max.
+    
+    Data:
+    - ${context.dueTodayCount} tasks due today (Top priority: ${context.topTask})
+    - ${context.appointmentsCount} appointments (Next: ${context.firstAppointment})
+    
+    Example Output: "Good morning, Boss. You have 5 tasks on the slate today, starting with the high-priority client review. Your first meeting is at 10 AM, so let's get moving."
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash-exp",
+      contents: prompt,
+    });
+    return response.text || "I'm ready to help you organize your day, Boss.";
+  } catch (e) {
+    console.error("Briefing Generation Failed", e);
+    return `You have ${context.dueTodayCount} tasks due today. Let's get to work.`;
+  }
+};
 
 // Helper for encoding binary data into a base64 string
 export function encode(bytes: Uint8Array) {

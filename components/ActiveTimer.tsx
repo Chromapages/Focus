@@ -17,7 +17,7 @@ const ActiveTimer: React.FC<ActiveTimerProps> = ({ block, soundEnabled, onComple
   const [timeLeft, setTimeLeft] = useState(block.durationMinutes * 60);
   const [isActive, setIsActive] = useState(true);
   const [isFinished, setIsFinished] = useState(false);
-  
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -33,15 +33,15 @@ const ActiveTimer: React.FC<ActiveTimerProps> = ({ block, soundEnabled, onComple
   // Initialize Timer Logic
   useEffect(() => {
     const savedData = localStorage.getItem(`timer-${block.id}`);
-    
+
     if (savedData) {
       const { targetTime, isPaused, pausedTimeLeft, storedActualStart } = JSON.parse(savedData);
       if (storedActualStart) setActualStartTime(storedActualStart);
-      
+
       if (isPaused) {
         setIsActive(false);
         setTimeLeft(pausedTimeLeft);
-        setEndTime(Date.now() + pausedTimeLeft * 1000); 
+        setEndTime(Date.now() + pausedTimeLeft * 1000);
       } else {
         const now = Date.now();
         if (targetTime > now) {
@@ -80,11 +80,11 @@ const ActiveTimer: React.FC<ActiveTimerProps> = ({ block, soundEnabled, onComple
           setTimeLeft(0);
           setIsFinished(true);
           setIsActive(false);
-          
+
           if (soundEnabled && audioRef.current) {
             audioRef.current.play().catch(e => console.log("Audio play failed", e));
           }
-          
+
           localStorage.removeItem(`timer-${block.id}`);
         } else {
           setTimeLeft(remaining);
@@ -135,70 +135,86 @@ const ActiveTimer: React.FC<ActiveTimerProps> = ({ block, soundEnabled, onComple
   const progress = ((totalSeconds - timeLeft) / totalSeconds) * 100;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col items-center justify-center p-6 text-white overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-brand-ink flex flex-col items-center justify-center p-6 text-white overflow-hidden">
+      {/* Ambient Background */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full blur-[120px] opacity-20 ${block.type === BlockType.Work ? 'bg-indigo-500' : 'bg-green-500'} animate-pulse`}></div>
+        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-[100px] opacity-30 ${block.type === BlockType.Work ? 'bg-brand-primary' : 'bg-emerald-600'} animate-pulse duration-3000`}></div>
       </div>
 
-      <div className="absolute top-6 right-6">
-        <button onClick={onCancel} className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors">
-            <X size={24} />
+      <div className="absolute top-8 right-8 z-50">
+        <button
+          onClick={onCancel}
+          className="p-4 rounded-full bg-white/10 hover:bg-white/20 transition-colors backdrop-blur-md active:scale-90"
+        >
+          <X size={28} />
         </button>
       </div>
 
-      <div className="relative z-10 w-full max-w-md flex flex-col items-center animate-fade-in-up">
-        <div className={`mb-8 p-6 rounded-3xl shadow-2xl backdrop-blur-md border border-white/10 ${block.type === BlockType.Work ? 'bg-indigo-600/30 text-indigo-300' : 'bg-green-600/30 text-green-300'}`}>
-          {block.type === BlockType.Work ? <Briefcase size={48} /> : <Coffee size={48} />}
+      <div className="relative z-10 w-full max-w-md flex flex-col items-center animate-fade-in-up flex-1 justify-center">
+        <div className={`mb-8 p-6 rounded-[32px] shadow-2xl backdrop-blur-md border border-white/10 ${block.type === BlockType.Work ? 'bg-brand-primary/40 text-indigo-200' : 'bg-emerald-600/40 text-emerald-100'}`}>
+          {block.type === BlockType.Work ? <Briefcase size={40} /> : <Coffee size={40} />}
         </div>
 
-        <h2 className="text-3xl md:text-4xl font-bold mb-2 text-center tracking-tight">{block.label}</h2>
-        <p className="text-slate-400 mb-2 text-center uppercase tracking-widest text-[10px] font-bold">
-          {block.type === BlockType.Work ? 'Focus Mode Engaged' : 'Recharge Time'}
+        <h2 className="text-3xl font-heading font-thin mb-2 text-center tracking-tight leading-tight px-4">{block.label}</h2>
+        <p className="text-slate-400 mb-12 text-center uppercase tracking-[0.2em] text-xs font-bold">
+          {block.type === BlockType.Work ? 'Deep Focus Session' : 'Recovery Break'}
         </p>
-        <div className="text-[10px] text-slate-500 font-mono mb-12">
-           Actual Start: {actualStartTime ? new Date(actualStartTime).toLocaleTimeString() : 'N/A'}
-        </div>
 
-        <div className="relative w-72 h-72 md:w-80 md:h-80 flex items-center justify-center mb-12">
+        {/* Timer Display */}
+        <div className="relative w-80 h-80 flex items-center justify-center mb-16">
+          {/* Progress Ring */}
           <svg className="absolute inset-0 w-full h-full -rotate-90 drop-shadow-2xl" viewBox="0 0 100 100">
-            <circle cx="50" cy="50" r="45" fill="none" stroke="#1e293b" strokeWidth="3" />
-            <circle cx="50" cy="50" r="45" fill="none" stroke={block.type === BlockType.Work ? '#6366f1' : '#22c55e'} 
-              strokeWidth="3" strokeDasharray="283" strokeDashoffset={283 - (283 * progress / 100)}
-              strokeLinecap="round" className="transition-all duration-1000 ease-linear"
+            {/* Track */}
+            <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="4" />
+            {/* Indicator */}
+            <circle
+              cx="50" cy="50" r="45" fill="none"
+              stroke={block.type === BlockType.Work ? '#6366f1' : '#10b981'}
+              strokeWidth="4"
+              strokeDasharray="283"
+              strokeDashoffset={283 - (283 * progress / 100)}
+              strokeLinecap="round"
+              className="transition-all duration-1000 ease-linear shadow-[0_0_15px_rgba(99,102,241,0.5)]"
             />
           </svg>
-          <div className="text-6xl md:text-7xl font-mono font-bold tracking-tighter drop-shadow-lg">
-            {formatTime(timeLeft)}
+
+          <div className="flex flex-col items-center">
+            <div className="text-7xl font-mono font-light tracking-tighter drop-shadow-lg tabular-nums">
+              {formatTime(timeLeft)}
+            </div>
+            <div className="text-sm font-bold text-slate-400 mt-2 opacity-60">
+              Started {actualStartTime ? new Date(actualStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-col gap-4 w-full max-w-xs">
+        {/* Controls */}
+        <div className="flex flex-col gap-5 w-full max-w-xs px-4">
           {!isFinished ? (
             <>
-              <div className="flex gap-4">
-                <button 
-                  onClick={toggleTimer}
-                  className="flex-1 flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur border border-white/5 transition-all font-semibold active:scale-95"
-                >
-                  {isActive ? <Pause size={20} /> : <Play size={20} />}
-                  {isActive ? 'Pause' : 'Resume'}
-                </button>
-              </div>
-              <button 
-                onClick={handleFinish}
-                className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors text-sm font-medium border border-transparent hover:border-white/10"
+              <button
+                onClick={toggleTimer}
+                className="w-full flex items-center justify-center gap-3 h-16 rounded-2xl bg-white text-brand-ink hover:bg-slate-100 transition-all font-bold text-lg shadow-lg active:scale-[0.98]"
               >
-                <CheckCircle size={18} /> Finish Early & Collect XP
+                {isActive ? <Pause size={24} className="fill-current" /> : <Play size={24} className="fill-current" />}
+                {isActive ? 'Pause Timer' : 'Resume Timer'}
+              </button>
+
+              <button
+                onClick={handleFinish}
+                className="w-full flex items-center justify-center gap-2 h-14 rounded-2xl text-slate-400 hover:text-white hover:bg-white/5 transition-colors text-sm font-bold tracking-wide"
+              >
+                <CheckCircle size={20} /> End Session Early
               </button>
             </>
           ) : (
             <div className="animate-bounce w-full">
-              <button 
+              <button
                 onClick={handleFinish}
-                className="w-full flex items-center justify-center gap-3 px-10 py-5 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 shadow-lg shadow-green-500/30 text-white font-bold text-lg transition-all transform hover:scale-105"
+                className="w-full flex items-center justify-center gap-3 h-20 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 shadow-xl shadow-emerald-500/30 text-white font-heading font-thin text-xl transition-all transform hover:scale-105"
               >
-                <CheckCircle size={24} />
-                Complete Block
+                <CheckCircle size={28} />
+                Complete Session
               </button>
             </div>
           )}
