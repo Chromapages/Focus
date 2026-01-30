@@ -1,8 +1,0 @@
-{
-  "name": "Focus by ChromaPages",
-  "description": "A gamified, AI-powered daily planner that structures your day into focused 90-minute blocks, respecting your life constraints.",
-  "requestFramePermissions": [
-    "microphone",
-    "camera"
-  ]
-}
