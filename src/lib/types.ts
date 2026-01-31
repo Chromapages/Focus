@@ -6,13 +6,32 @@ export type InboxItem = {
   text: string;
   createdAt: number; // ms
   archivedAt?: number;
+  convertedTo?: InboxKind;
+  convertedAt?: number;
 };
+
+export type TaskStatus = 'open' | 'done' | 'waiting';
 
 export type Task = {
   id: string;
   title: string;
   createdAt: number;
   dueAt?: number; // ms
-  status: 'open' | 'done' | 'waiting';
+  status: TaskStatus;
   priority?: 'low' | 'med' | 'high';
+};
+
+export type Note = {
+  id: string;
+  title?: string;
+  body: string;
+  createdAt: number;
+  updatedAt?: number;
+};
+
+export type Snippet = {
+  id: string;
+  title?: string;
+  body: string;
+  createdAt: number;
 };

@@ -1,11 +1,22 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { collection, limit, onSnapshot, orderBy, query, updateDoc, doc } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
+import {
+  addDoc,
+  collection,
+  doc,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
+  writeBatch,
+} from 'firebase/firestore';
 import { getDb } from '@/lib/firestore';
-import { getFirebaseAuth } from '@/lib/firebaseClient';
-import type { InboxItem } from '@/lib/types';
+import type { InboxItem, InboxKind } from '@/lib/types';
+import { Button } from '@/components/ui/Button';
+import { useUid } from '@/lib/useUid';
 
 function cx(...s: Array<string | false | null | undefined>) {
   return s.filter(Boolean).join(' ');
@@ -13,14 +24,9 @@ function cx(...s: Array<string | false | null | undefined>) {
 
 export function InboxList() {
   const [items, setItems] = useState<InboxItem[]>([]);
-  const [uid, setUid] = useState<string | null>(null);
+  const uid = useUid();
 
   const db = useMemo(() => getDb(), []);
-
-  useEffect(() => {
-    const auth = getFirebaseAuth();
-    return onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null));
-  }, []);
 
   useEffect(() => {
     if (!uid) return;
@@ -36,6 +42,8 @@ export function InboxList() {
           text: data.text,
           createdAt: data.createdAt,
           archivedAt: data.archivedAt,
+          convertedTo: data.convertedTo,
+          convertedAt: data.convertedAt,
         });
       });
       setItems(next);
@@ -45,6 +53,54 @@ export function InboxList() {
   async function archive(id: string) {
     if (!uid) return;
     await updateDoc(doc(db, 'users', uid, 'inbox', id), { archivedAt: Date.now() });
+  }
+
+  async function convert(item: InboxItem, to: InboxKind) {
+    if (!uid) return;
+
+    const batch = writeBatch(db);
+
+    if (to === 'task') {
+      const ref = doc(collection(db, 'users', uid, 'tasks'));
+      batch.set(ref, {
+        title: item.text.trim(),
+        createdAt: Date.now(),
+        status: 'open',
+        createdAtServer: serverTimestamp(),
+        source: { inboxId: item.id },
+      });
+    }
+
+    if (to === 'note') {
+      const ref = doc(collection(db, 'users', uid, 'notes'));
+      batch.set(ref, {
+        title: item.text.trim().slice(0, 60),
+        body: item.text.trim(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        createdAtServer: serverTimestamp(),
+        source: { inboxId: item.id },
+      });
+    }
+
+    if (to === 'snippet') {
+      const ref = doc(collection(db, 'users', uid, 'snippets'));
+      batch.set(ref, {
+        title: item.text.trim().slice(0, 60),
+        body: item.text.trim(),
+        createdAt: Date.now(),
+        createdAtServer: serverTimestamp(),
+        source: { inboxId: item.id },
+      });
+    }
+
+    batch.update(doc(db, 'users', uid, 'inbox', item.id), {
+      archivedAt: Date.now(),
+      convertedTo: to,
+      convertedAt: Date.now(),
+    });
+
+    await batch.commit();
   }
 
   return (
@@ -61,23 +117,30 @@ export function InboxList() {
           {items.map((it) => (
             <li key={it.id} className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-3">
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <div className="text-xs uppercase tracking-wide text-zinc-400">{it.kind}</div>
-                  <div className="mt-1 text-sm text-zinc-100">{it.text}</div>
+                  <div className="mt-1 break-words text-sm text-zinc-100">{it.text}</div>
                   <div className="mt-1 text-xs text-zinc-500">{new Date(it.createdAt).toLocaleString()}</div>
                 </div>
-                <button
-                  className={cx(
-                    'rounded-lg border border-zinc-700 px-3 py-2 text-xs font-medium',
-                    'text-zinc-100 hover:bg-zinc-900'
-                  )}
-                  onClick={() => archive(it.id)}
-                >
+                <Button size="sm" variant="ghost" onClick={() => archive(it.id)}>
                   Archive
-                </button>
+                </Button>
               </div>
-              <div className="mt-2 text-xs text-zinc-500">
-                Next: convert to task/note/snippet + add due date (triage actions coming next).
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button size="sm" variant="primary" onClick={() => convert(it, 'task')}>
+                  Convert → Task
+                </Button>
+                <Button size="sm" onClick={() => convert(it, 'note')}>
+                  Convert → Note
+                </Button>
+                <Button size="sm" onClick={() => convert(it, 'snippet')}>
+                  Convert → Snippet
+                </Button>
+              </div>
+
+              <div className={cx('mt-2 text-xs text-zinc-500', it.kind === 'task' && 'hidden')}>
+                Tip: set due dates + “Waiting” on the Tasks page.
               </div>
             </li>
           ))}
