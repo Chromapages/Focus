@@ -25,8 +25,8 @@ export default function SignInPage() {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
       router.replace('/today');
-    } catch (e: any) {
-      setError(e?.message || 'Sign-in failed');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Sign-in failed');
     } finally {
       setBusy(false);
     }

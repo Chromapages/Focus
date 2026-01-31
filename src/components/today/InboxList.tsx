@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  addDoc,
   collection,
   doc,
   limit,
@@ -34,16 +33,16 @@ export function InboxList() {
     return onSnapshot(q, (snap) => {
       const next: InboxItem[] = [];
       snap.forEach((d) => {
-        const data = d.data() as any;
+        const data = d.data() as Record<string, unknown>;
         if (data.archivedAt) return;
         next.push({
           id: d.id,
-          kind: data.kind,
-          text: data.text,
-          createdAt: data.createdAt,
-          archivedAt: data.archivedAt,
-          convertedTo: data.convertedTo,
-          convertedAt: data.convertedAt,
+          kind: (data.kind as InboxKind) ?? 'task',
+          text: String(data.text ?? ''),
+          createdAt: Number(data.createdAt ?? 0),
+          archivedAt: data.archivedAt == null ? undefined : Number(data.archivedAt),
+          convertedTo: (data.convertedTo as InboxKind) ?? undefined,
+          convertedAt: data.convertedAt == null ? undefined : Number(data.convertedAt),
         });
       });
       setItems(next);
@@ -52,7 +51,9 @@ export function InboxList() {
 
   async function archive(id: string) {
     if (!uid) return;
-    await updateDoc(doc(db, 'users', uid, 'inbox', id), { archivedAt: Date.now() });
+    // eslint-disable-next-line react-hooks/purity
+    const ts = Date.now();
+    await updateDoc(doc(db, 'users', uid, 'inbox', id), { archivedAt: ts });
   }
 
   async function convert(item: InboxItem, to: InboxKind) {

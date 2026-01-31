@@ -39,13 +39,13 @@ export default function NotesPage() {
     return onSnapshot(q, (snap) => {
       const next: Note[] = [];
       snap.forEach((d) => {
-        const data = d.data() as any;
+        const data = d.data() as Record<string, unknown>;
         next.push({
           id: d.id,
-          title: data.title,
-          body: data.body,
-          createdAt: data.createdAt,
-          updatedAt: data.updatedAt,
+          title: data.title == null ? undefined : String(data.title),
+          body: String(data.body ?? ''),
+          createdAt: Number(data.createdAt ?? 0),
+          updatedAt: data.updatedAt == null ? undefined : Number(data.updatedAt),
         });
       });
       setNotes(next);

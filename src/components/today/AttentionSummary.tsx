@@ -41,14 +41,14 @@ export function AttentionSummary() {
     return onSnapshot(q, (snap) => {
       const next: TaskDoc[] = [];
       snap.forEach((d) => {
-        const data = d.data() as any;
+        const data = d.data() as Record<string, unknown>;
         if (data.status === 'done') return;
         next.push({
-          title: data.title,
-          createdAt: data.createdAt,
-          dueAt: data.dueAt,
-          status: data.status,
-          priority: data.priority,
+          title: String(data.title ?? ''),
+          createdAt: Number(data.createdAt ?? 0),
+          dueAt: data.dueAt == null ? undefined : Number(data.dueAt),
+          status: (data.status as TaskDoc['status']) ?? 'open',
+          priority: (data.priority as TaskDoc['priority']) ?? undefined,
         });
       });
       setTasks(next);

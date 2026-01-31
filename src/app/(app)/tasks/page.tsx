@@ -44,14 +44,14 @@ export default function TasksPage() {
     return onSnapshot(q, (snap) => {
       const next: Task[] = [];
       snap.forEach((d) => {
-        const data = d.data() as any;
+        const data = d.data() as Record<string, unknown>;
         next.push({
           id: d.id,
-          title: data.title,
-          createdAt: data.createdAt,
-          dueAt: data.dueAt,
-          status: data.status,
-          priority: data.priority,
+          title: String(data.title ?? ''),
+          createdAt: Number(data.createdAt ?? 0),
+          dueAt: data.dueAt == null ? undefined : Number(data.dueAt),
+          status: (data.status as TaskStatus) ?? 'open',
+          priority: (data.priority as Task['priority']) ?? undefined,
         });
       });
       setTasks(next);
