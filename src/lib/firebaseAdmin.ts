@@ -22,6 +22,11 @@ export function getFirebaseAdminApp() {
   });
 }
 
+export function getAdminDb() {
+  const app = getFirebaseAdminApp();
+  return admin.firestore(app);
+}
+
 export async function verifyFirebaseIdToken(idToken: string) {
   const app = getFirebaseAdminApp();
   return admin.auth(app).verifyIdToken(idToken);

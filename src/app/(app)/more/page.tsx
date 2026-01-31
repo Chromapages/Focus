@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 const LINKS = [
   { href: '/planner', label: 'Weekly Planner' },
+  { href: '/meetings/new', label: 'New meeting (transcript → notes/tasks)' },
   { href: '/copy', label: 'Copy Board' },
   { href: '/vault', label: 'Vault' },
   { href: '/settings', label: 'Settings' },
