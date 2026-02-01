@@ -18,6 +18,20 @@ import type { Note } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { 
+  Plus, 
+  Search, 
+  FileText, 
+  Trash2, 
+  Edit3, 
+  Clock, 
+  ChevronRight,
+  MoreVertical,
+  Type
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function NotesPage() {
   const db = useMemo(() => getDb(), []);
@@ -95,95 +109,114 @@ export default function NotesPage() {
   }
 
   return (
-    <section className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Notes</h1>
-        <p className="mt-1 text-sm text-zinc-400">Basic notes CRUD. (Meeting notes/backlinks coming later.)</p>
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div>
+          <Badge variant="accent" className="mb-2">Second Brain</Badge>
+          <h1 className="text-4xl font-bold tracking-tight">Notes</h1>
+          <p className="mt-2 text-foreground/50 max-w-md">
+            Capture knowledge, draft ideas, and organize your digital library.
+          </p>
+        </div>
       </div>
 
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
-        <h2 className="text-lg font-semibold">New note</h2>
-        <div className="mt-3 space-y-2">
-          <Input placeholder="Title (optional)…" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} />
-          <Textarea
-            placeholder="Write…"
-            rows={5}
-            value={newBody}
-            onChange={(e) => setNewBody(e.target.value)}
-          />
-          <div className="flex justify-end">
-            <Button variant="primary" onClick={addNote} disabled={adding}>
-              {adding ? 'Adding…' : 'Add note'}
-            </Button>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Editor Sidebar */}
+        <div className="lg:col-span-12">
+          <Card variant="glass" className="overflow-hidden">
+            <div className="p-1 px-4 border-b border-border-subtle bg-white/[0.02] flex items-center justify-between">
+               <span className="text-[10px] font-bold text-foreground/20 uppercase tracking-widest">Editor</span>
+               <div className="flex gap-2">
+                  <div className="w-2 h-2 rounded-full bg-red-500/20" />
+                  <div className="w-2 h-2 rounded-full bg-yellow-500/20" />
+                  <div className="w-2 h-2 rounded-full bg-emerald-500/20" />
+               </div>
+            </div>
+            <div className="p-6 space-y-4">
+              <Input 
+                placeholder="Note Title (optional)" 
+                value={newTitle} 
+                onChange={(e) => setNewTitle(e.target.value)} 
+                className="bg-transparent border-none text-xl font-bold px-0 focus-visible:ring-0 focus-visible:border-none"
+              />
+              <Textarea
+                placeholder="Start writing..."
+                rows={6}
+                value={newBody}
+                onChange={(e) => setNewBody(e.target.value)}
+                className="bg-transparent border-none px-0 focus-visible:ring-0 focus-visible:border-none text-base leading-relaxed"
+              />
+              <div className="flex justify-end pt-4 border-t border-border-subtle">
+                <Button variant="primary" onClick={addNote} disabled={adding || !newBody.trim()} loading={adding} icon={<Plus size={18} />}>
+                  Save Note
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Notes Feed */}
+        <div className="lg:col-span-12 space-y-4">
+          <div className="flex items-center justify-between px-2">
+             <h2 className="text-sm font-bold uppercase tracking-widest text-foreground/30">LATEST NOTES • {notes.length}</h2>
           </div>
-        </div>
-      </div>
 
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Your notes</h2>
-          <span className="text-xs text-zinc-400">{notes.length} note(s)</span>
-        </div>
-
-        {notes.length === 0 ? (
-          <p className="mt-3 text-sm text-zinc-400">No notes yet.</p>
-        ) : (
-          <ul className="mt-3 space-y-2">
-            {notes.map((n) => (
-              <li key={n.id} className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-3">
-                {editingId === n.id ? (
-                  <div className="space-y-2">
-                    <Input value={draftTitle} onChange={(e) => setDraftTitle(e.target.value)} />
-                    <Textarea rows={7} value={draftBody} onChange={(e) => setDraftBody(e.target.value)} />
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="primary" onClick={() => save(n.id)}>
-                        Save
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditingId(null);
-                          setDraftTitle('');
-                          setDraftBody('');
+          {notes.length === 0 ? (
+            <Card variant="glass" className="py-20 flex flex-col items-center justify-center text-center opacity-50 border-dashed">
+               <FileText size={40} className="mb-4 text-foreground/20" />
+               <p className="text-sm font-medium">Your library is empty</p>
+               <p className="text-xs text-foreground/40 mt-1">Start writing your first note above.</p>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {notes.map((n) => (
+                <Card 
+                  key={n.id} 
+                  variant="interactive" 
+                  className="p-5 flex flex-col h-full group/note"
+                  onClick={() => {
+                    if (editingId !== n.id) {
+                      setEditingId(n.id);
+                      setDraftTitle(n.title ?? '');
+                      setDraftBody(n.body ?? '');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                  }}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center text-accent">
+                      <FileText size={16} />
+                    </div>
+                    <div className="opacity-0 group-hover/note:opacity-100 transition-opacity">
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="h-8 w-8 p-0 text-red-500 hover:text-red-400"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          remove(n.id);
                         }}
                       >
-                        Cancel
+                        <Trash2 size={14} />
                       </Button>
                     </div>
                   </div>
-                ) : (
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium text-zinc-100">{n.title || 'Untitled'}</div>
-                      <div className="mt-1 whitespace-pre-wrap text-sm text-zinc-200">{n.body}</div>
-                      <div className="mt-2 text-xs text-zinc-500">
-                        {new Date(n.updatedAt ?? n.createdAt).toLocaleString()}
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditingId(n.id);
-                          setDraftTitle(n.title ?? '');
-                          setDraftBody(n.body ?? '');
-                        }}
-                      >
-                        Edit
-                      </Button>
-                      <Button size="sm" variant="danger" onClick={() => remove(n.id)}>
-                        Delete
-                      </Button>
-                    </div>
+
+                  <h3 className="font-bold text-foreground mb-2 line-clamp-1">{n.title || 'Untitled'}</h3>
+                  <p className="text-sm text-foreground/50 line-clamp-4 flex-1 mb-4 leading-relaxed">
+                    {n.body}
+                  </p>
+
+                  <div className="flex items-center gap-2 mt-auto pt-4 border-t border-border-subtle/50 text-[10px] text-foreground/30 font-bold uppercase tracking-widest">
+                    <Clock size={10} />
+                    {new Date(n.updatedAt ?? n.createdAt).toLocaleDateString()}
                   </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </section>
+    </div>
   );
 }
